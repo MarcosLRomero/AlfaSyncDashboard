@@ -1,0 +1,9 @@
+c:\dev\AlfaSyncDashboard\dist\AlfaSyncDashboard.pdb
+c:\dev\AlfaSyncDashboard\dist\appsettings.json
+c:\dev\AlfaSyncDashboard\dist\D3DCompiler_47_cor3.dll
+c:\dev\AlfaSyncDashboard\dist\PenImc_cor3.dll
+c:\dev\AlfaSyncDashboard\dist\PresentationNative_cor3.dll
+c:\dev\AlfaSyncDashboard\dist\vcruntime140_cor3.dll
+c:\dev\AlfaSyncDashboard\dist\wpfgfx_cor3.dll
+c:\dev\AlfaSyncDashboard\dist\Microsoft.Data.SqlClient.SNI.dll
+c:\dev\AlfaSyncDashboard\dist\AlfaSyncDashboard.exe
