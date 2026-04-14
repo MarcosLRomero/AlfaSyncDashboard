@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("AlfaSyncDashboard")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9e44d28bce3217e32129a8d957f674a39850e902")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e0008b7743c7eee97ba1d52e5e49bb023b3a6b7f")]
 [assembly: System.Reflection.AssemblyProductAttribute("AlfaSyncDashboard")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AlfaSyncDashboard")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

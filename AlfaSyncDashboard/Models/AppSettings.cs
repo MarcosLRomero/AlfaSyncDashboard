@@ -39,6 +39,6 @@ public sealed class WindowsServiceSettings
 
 public sealed class SyncStatisticsSettings
 {
-    public string ApiUrl { get; set; } = "https://alfanet.ddns.net/AGW/V1/control/estadisticas";
+    public string ApiUrl { get; set; } = "https://alfanetac.ddns.net/AGW/V1/control/GrabarControlSincro";
     public string IdCliente { get; set; } = string.Empty;
 }

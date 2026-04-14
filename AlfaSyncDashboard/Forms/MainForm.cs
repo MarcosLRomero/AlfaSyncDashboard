@@ -244,7 +244,7 @@ public sealed class MainForm : Form
                     },
                     AppendLog,
                     _cts.Token,
-                    Environment.UserName);
+                    false);
 
                 tpv.EstadoActual = "OK";
                 tpv.UltimaSincronizacion = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss");

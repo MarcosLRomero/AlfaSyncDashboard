@@ -1,4 +1,8 @@
+using System.Diagnostics;
+using System.Net.Http;
 using System.Net.Http.Json;
+using System.Text;
+using System.Text.Json;
 using AlfaSyncDashboard.Models;
 using Microsoft.Data.SqlClient;
 
@@ -21,15 +25,20 @@ public sealed class SyncStatisticsService
         string stageName,
         string fileName,
         int sequence,
-        string executionUser,
+        bool executedByService,
         DateTime startedAt,
         DateTime finishedAt,
         Exception? exception,
+        int? updatedCount,
+        int? insertedCount,
         Action<string>? appendLog = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(_settings.SyncStatistics.ApiUrl))
+        {
+            appendLog?.Invoke($"[SyncStatistics] No se envia a la API para {tpv.Descripcion}/{stageName}: ApiUrl vacia.");
             return;
+        }
 
         var clientId = await ResolveClientIdAsync(cancellationToken);
         if (string.IsNullOrWhiteSpace(clientId))
@@ -41,24 +50,32 @@ public sealed class SyncStatisticsService
         var payload = new SyncStatisticPayload
         {
             IdCliente = clientId,
-            Fecha = startedAt.ToString("yyyy-MM-dd HH:mm:ss"),
+            Fecha = startedAt.ToString("dd-MM-yyyy HH:mm:ss"),
             Secuencia = sequence,
             NombrePC = Environment.MachineName,
             ServidorSQL = Limit(tpv.Server, 250),
-            Usuario = Limit(string.IsNullOrWhiteSpace(executionUser) ? Environment.UserName : executionUser.Trim(), 150),
+            Usuario = Limit(BuildExecutionUser(tpv, executedByService), 150),
             BaseDatos = Limit(BuildDatabaseLabel(tpv.DbName), 150),
             NroError = GetErrorNumber(exception),
             MensajeError = Limit(exception?.Message ?? string.Empty, 255),
-            Proceso = Limit($"Sincronizacion de {stageName} - {tpv.Descripcion}", 250),
-            FhHsFinProceso = finishedAt.ToString("yyyy-MM-dd HH:mm:ss"),
+            Proceso = Limit(BuildProcessLabel(stageName, tpv.Descripcion, exception, updatedCount, insertedCount), 250),
+            FhHsFinProceso = finishedAt.ToString("dd-MM-yyyy HH:mm:ss"),
             Archivo = Limit(fileName, 200)
         };
 
+        var payloadJson = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
+        appendLog?.Invoke($"[SyncStatistics] Payload para {tpv.Descripcion}/{stageName}:{Environment.NewLine}{payloadJson}");
+        Debug.WriteLine($"[SyncStatistics] Payload para {tpv.Descripcion}/{stageName}:{Environment.NewLine}{payloadJson}");
+
         try
         {
-            using var response = await HttpClient.PostAsJsonAsync(_settings.SyncStatistics.ApiUrl.Trim(), payload, cancellationToken);
+            using var content = new StringContent(payloadJson, Encoding.UTF8, "application/json");
+            using var response = await HttpClient.PostAsync(_settings.SyncStatistics.ApiUrl.Trim(), content, cancellationToken);
             if (response.IsSuccessStatusCode)
+            {
+                appendLog?.Invoke($"[SyncStatistics] Envio OK para {tpv.Descripcion}/{stageName}. HTTP {(int)response.StatusCode}.");
                 return;
+            }
 
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             appendLog?.Invoke($"No se pudo enviar control de sincronizacion para {tpv.Descripcion}/{stageName}. HTTP {(int)response.StatusCode}: {body}");
@@ -118,6 +135,22 @@ WHERE CLAVE = @Clave;", cn)
         }
 
         return $"{centralDatabase} + {localDatabase}";
+    }
+
+    private static string BuildExecutionUser(TpvInfo tpv, bool executedByService)
+    {
+        var dbUser = string.IsNullOrWhiteSpace(tpv.Usuario) ? "dbuser" : tpv.Usuario.Trim();
+        var origin = executedByService ? "Servicio" : "Manual";
+        return $"{dbUser} {origin}";
+    }
+
+    private static string BuildProcessLabel(string stageName, string localDescription, Exception? exception, int? updatedCount, int? insertedCount)
+    {
+        var process = $"Sincronizacion de {stageName} - {localDescription}";
+        if (exception is not null || updatedCount is null || insertedCount is null)
+            return process;
+
+        return $"{process} - {updatedCount.Value} actualizados, {insertedCount.Value} altas";
     }
 
     private static int GetErrorNumber(Exception? exception)

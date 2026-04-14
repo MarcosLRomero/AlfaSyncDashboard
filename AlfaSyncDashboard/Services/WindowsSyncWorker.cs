@@ -67,7 +67,7 @@ public sealed class WindowsSyncWorker : BackgroundService
                     progress => Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {progress.LocalDescripcion} - {progress.Etapa} ({progress.OverallPercent}%)"),
                     message => Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {message}"),
                     cancellationToken,
-                    "proceso automatico alfa");
+                    true);
                 await _logService.WriteAsync(tpv.Descripcion, mode.ToString(), "Sincronizacion automatica OK", "OK", cancellationToken);
             }
             catch (Exception ex)

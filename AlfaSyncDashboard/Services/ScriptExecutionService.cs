@@ -22,14 +22,13 @@ public sealed class ScriptExecutionService
         Action<ExecutionProgress> reportProgress,
         Action<string> appendLog,
         CancellationToken cancellationToken,
-        string? executionUser = null)
+        bool executedByService = false)
     {
         if (!_settings.ScriptSets.TryGetValue(tpv.ScriptSet, out var scriptSet))
             throw new InvalidOperationException($"No existe el ScriptSet '{tpv.ScriptSet}' para el local {tpv.Descripcion}.");
 
         var stages = BuildStages(scriptSet, mode);
         var stopwatch = Stopwatch.StartNew();
-        var effectiveExecutionUser = string.IsNullOrWhiteSpace(executionUser) ? Environment.UserName : executionUser.Trim();
 
         for (int i = 0; i < stages.Count; i++)
         {
@@ -37,6 +36,8 @@ public sealed class ScriptExecutionService
             var stage = stages[i];
             var stageStartedAt = DateTime.Now;
             var overallPercent = 0;
+            var updatedCount = 0;
+            var insertedCount = 0;
             try
             {
                 var scriptPath = Path.Combine(_settings.DefaultScriptsPath, stage.FileName);
@@ -58,16 +59,18 @@ public sealed class ScriptExecutionService
 
                 var spec = ResolveSpec(stage.FileName);
                 appendLog($"[{tpv.Descripcion}] Sincronizando {stage.DisplayName} por conexión directa al local.");
-                await SyncDirectAsync(tpv, spec, appendLog, cancellationToken);
+                (updatedCount, insertedCount) = await SyncDirectAsync(tpv, spec, appendLog, cancellationToken);
                 await _syncStatisticsService.ReportStageAsync(
                     tpv,
                     stage.DisplayName,
                     stage.FileName,
                     i + 1,
-                    effectiveExecutionUser,
+                    executedByService,
                     stageStartedAt,
                     DateTime.Now,
                     null,
+                    updatedCount,
+                    insertedCount,
                     appendLog,
                     CancellationToken.None);
             }
@@ -78,10 +81,12 @@ public sealed class ScriptExecutionService
                     stage.DisplayName,
                     stage.FileName,
                     i + 1,
-                    effectiveExecutionUser,
+                    executedByService,
                     stageStartedAt,
                     DateTime.Now,
                     ex,
+                    null,
+                    null,
                     appendLog,
                     CancellationToken.None);
                 throw;
@@ -102,7 +107,7 @@ public sealed class ScriptExecutionService
         }
     }
 
-    private async Task SyncDirectAsync(TpvInfo tpv, SyncTableSpec spec, Action<string> appendLog, CancellationToken cancellationToken)
+    private async Task<(int Updated, int Inserted)> SyncDirectAsync(TpvInfo tpv, SyncTableSpec spec, Action<string> appendLog, CancellationToken cancellationToken)
     {
         var sourceTable = await LoadSourceDataAsync(spec, cancellationToken);
         appendLog($"[{tpv.Descripcion}] {spec.DisplayName}: {sourceTable.Rows.Count} filas leídas desde central.");
@@ -110,7 +115,7 @@ public sealed class ScriptExecutionService
         if (sourceTable.Rows.Count == 0)
         {
             appendLog($"[{tpv.Descripcion}] {spec.DisplayName}: no hay filas para sincronizar.");
-            return;
+            return (0, 0);
         }
 
         await using var localConnection = new SqlConnection(tpv.BuildLocalConnectionString());
@@ -127,6 +132,7 @@ public sealed class ScriptExecutionService
             var inserted = await ExecuteScalarIntAsync(localConnection, transaction, BuildInsertSql(tempTableName, spec), cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             appendLog($"[{tpv.Descripcion}] {spec.DisplayName}: {updated} actualizados, {inserted} insertados.");
+            return (updated, inserted);
         }
         catch
         {
